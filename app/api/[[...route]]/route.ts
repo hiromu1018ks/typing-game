@@ -1,5 +1,4 @@
 import { Redis } from "@upstash/redis";
-import { error } from "console";
 import { Hono } from "hono";
 import { env } from "hono/adapter";
 import { handle } from "hono/vercel";
@@ -38,6 +37,38 @@ app.post("result", async (c) => {
     await redis.zadd("typing-score-rank", result);
 
     return c.json({ message: "Success" }, 200);
+  } catch (e) {
+    return c.json({ error: `Error ${e}` }, 500);
+  }
+});
+
+app.get("/result", async (c) => {
+  try {
+    const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+      env<EnvConfig>(c);
+
+    const redis = new Redis({
+      url: UPSTASH_REDIS_REST_URL,
+      token: UPSTASH_REDIS_REST_TOKEN,
+    });
+
+    const results = await redis.zrange("typing-score-rank", 0, 9, {
+      rev: true,
+      withScores: true,
+    });
+
+    const scores = [];
+
+    for (let i = 0; i < results.length; i += 2) {
+      scores.push({
+        userName: results[i],
+        score: results[i + 1],
+      });
+    }
+
+    return c.json({
+      results: scores,
+    });
   } catch (e) {
     return c.json({ error: `Error ${e}` }, 500);
   }
